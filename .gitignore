@@ -1,0 +1,14 @@
+# built program
+cs238
+
+# compiler output
+*.o
+*.d
+*.so
+
+# generated on each run
+out.c
+
+# editor backups removed by `make clean`
+*~
+*#
