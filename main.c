@@ -82,13 +82,12 @@
  static void
  generate(const struct parser_dag *dag, FILE *file)
  {
-     fprintf(file, "double sigmoid(double);\n");
-     fprintf(file, "double evaluate(void) {\n");
+     fprintf(file, "double evaluate(double (*sigmoid_fn)(double)) {\n");
      reflect(dag, file);
-     fprintf(file, "return sigmoid(t%d);\n}\n", dag->id);
+     fprintf(file, "return sigmoid_fn(t%d);\n}\n", dag->id);
  }
- 
- typedef double (*evaluate_t)(void);
+
+ typedef double (*evaluate_t)(double (*)(double));
  
  int
  main(int argc, char *argv[])
@@ -142,7 +141,7 @@
          TRACE(0);
          return -1;
      }
-     printf("%f\n", fnc());
+     printf("%f\n", fnc(sigmoid));
  
      /* done */
  
