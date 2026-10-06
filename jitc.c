@@ -56,8 +56,8 @@
      if (0 == child) {
          /* gcc -fpic -shared -o output input. NULL ends the argument list. */
          argv[0] = "/usr/bin/gcc";
-         argv[1] = "-fpic";
-         argv[2] = "-shared";
+         argv[1] = "-fpic"; /* live anywhere in memory*/
+         argv[2] = "-shared"; /* create a shared library*/
          argv[3] = "-o";
          argv[4] = (char *)output;
          argv[5] = (char *)input;
