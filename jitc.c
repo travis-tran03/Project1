@@ -42,12 +42,9 @@
  int
  jitc_compile(const char *input, const char *output)
  {
-     char *argv[16];
+     char *argv[8];
      pid_t pid, child;
      int status;
-
-     assert( safe_strlen(input) );
-     assert( safe_strlen(output) );
 
      /* Fork a child process, because execv replaces the calling process and
         would never return to this program. */
@@ -57,41 +54,28 @@
          return -1;
      }
      if (0 == child) {
-         /* Build the gcc command line (compiler path, warning and optimization
-            flags, -shared, -o output, input file), terminated by NULL. */
+         /* gcc -fpic -shared -o output input. NULL ends the argument list. */
          argv[0] = "/usr/bin/gcc";
-         argv[1] = "-ansi";
-         argv[2] = "-pedantic";
-         argv[3] = "-Wall";
-         argv[4] = "-Wextra";
-         argv[5] = "-Werror";
-         argv[6] = "-Wfatal-errors";
-         argv[7] = "-fpic";
-         argv[8] = "-O3";
-         argv[9] = "-shared";
-         argv[10] = "-o";
-         argv[11] = (char *)output;
-         argv[12] = (char *)input;
-         argv[13] = NULL;
+         argv[1] = "-fpic";
+         argv[2] = "-shared";
+         argv[3] = "-o";
+         argv[4] = (char *)output;
+         argv[5] = (char *)input;
+         argv[6] = NULL;
          /* Replace the child process with gcc. This only returns if exec
             fails, in which case we exit with status 127. */
          execv(argv[0], argv);
          TRACE("execv()");
          _exit(127);
      }
-     /* Parent waits for the child to finish compiling, retrying if interrupted
-        by a signal (EINTR). */
-     do {
-         pid = waitpid(child, &status, 0);
-     } while ((0 > pid) && (EINTR == errno));
+     /* Parent waits for the child to finish compiling. */
+     pid = waitpid(child, &status, 0);
      if (0 > pid) {
          TRACE("waitpid()");
          return -1;
      }
-     /* Make sure gcc exited normally with status 0. If not, delete the output
-        file and report failure. */
+     /* Make sure gcc exited normally with status 0. */
      if (!WIFEXITED(status) || WEXITSTATUS(status)) {
-         file_delete(output);
          TRACE("gcc");
          return -1;
      }
@@ -109,16 +93,14 @@
      const char *path;
      void *handle;
 
-     assert( safe_strlen(pathname) );
-
      path = pathname;
      /* load the shared library */
-     handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+     handle = dlopen(path, RTLD_NOW);
      /* retry with ./ if no slash in name */
      if (!handle && !strchr(pathname, '/')) {
          safe_sprintf(buf, sizeof (buf), "./%s", pathname);
          path = buf;
-         handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+         handle = dlopen(path, RTLD_NOW);
      }
      /* library failed to load */
      if (!handle) {
@@ -131,7 +113,6 @@
          dlclose(handle);
          return NULL;
      }
-     memset(jitc, 0, sizeof (struct jitc));
      /* store the library handle */
      jitc->handle = handle;
      return jitc;
@@ -142,11 +123,8 @@
  jitc_close(struct jitc *jitc)
  {
      if (jitc) {
-         if (jitc->handle) {
-             /* unload the library */
-             dlclose(jitc->handle);
-         }
-         memset(jitc, 0, sizeof (struct jitc));
+         /* unload the library */
+         dlclose(jitc->handle);
      }
      FREE(jitc);
  }
@@ -156,21 +134,13 @@
  long
  jitc_lookup(struct jitc *jitc, const char *symbol)
  {
-     const char *err;
      void *addr;
 
-     assert( jitc );
-     assert( jitc->handle );
-     assert( safe_strlen(symbol) );
-
-     /* clear any old error */
-     dlerror();
      /* find the symbol's address */
      addr = dlsym(jitc->handle, symbol);
-     err = dlerror();
      /* symbol not found */
-     if (err || !addr) {
-         TRACE(err);
+     if (!addr) {
+         TRACE(dlerror());
          return 0;
      }
      return (long)(intptr_t)addr;
